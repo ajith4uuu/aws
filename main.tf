@@ -22,7 +22,7 @@ variable "security_group_id" {
 resource "aws_instance" "example" {
   instance_type          = var.instance_type
   key_name               = var.key_name
-  ami                    = "ami-0abcdef1234567890" # Replace with a valid AMI ID for your region
+  ami                    = "ami-05c13eab67c5d8861" # Replace with a valid AMI ID for your region
   subnet_id              = var.subnet_id
   vpc_security_group_ids = [var.security_group_id]
 
