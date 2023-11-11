@@ -1,3 +1,14 @@
+terraform {
+  backend "s3" {
+    bucket         = "aws-service-catalog-terraform"
+    key            = "arn:aws:kms:us-east-1:873450754983:key/mrk-9434e178101949e4ae3895bb3d63b33c"
+    region         = "us-east-1"
+    encrypt        = true
+    dynamodb_table = "service-catalog-terraform"
+    acl            = "bucket-owner-full-control"
+  }
+}
+
 variable "instance_type" {
   description = "EC2 instance type"
   type        = string
