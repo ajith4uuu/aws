@@ -1,53 +1,103 @@
-terraform {
-  backend "s3" {
-    bucket         = "aws-service-catalog-terraform"
-    key            = "arn:aws:kms:us-east-1:873450754983:key/mrk-9434e178101949e4ae3895bb3d63b33c"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "service-catalog-terraform"
-    acl            = "bucket-owner-full-control"
+provider "aws" {
+  region = "us-east-1"
+}
+
+resource "aws_vpc" "my_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "MyVPC"
   }
 }
 
-variable "instance_type" {
-  description = "EC2 instance type"
-  type        = string
-  default     = "t2.micro"
+resource "aws_subnet" "my_subnet" {
+  vpc_id                  = aws_vpc.my_vpc.id
+  cidr_block              = "10.0.1.0/24"
+  map_public_ip_on_launch = true
 }
 
-variable "key_name" {
-  description = "Name of an existing EC2 KeyPair to enable SSH access to the instance"
-  type        = string
+resource "aws_security_group" "my_sg" {
+  vpc_id = aws_vpc.my_vpc.id
+
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "MySecurityGroup"
+  }
 }
 
-variable "subnet_id" {
-  description = "The id of the subnet in which to launch the instance"
-  type        = string
-}
-
-variable "security_group_id" {
-  description = "Security group to associate with the EC2 instance."
-  type        = string
-}
-
-resource "aws_instance" "example" {
-  instance_type          = var.instance_type
-  key_name               = var.key_name
-  ami                    = "ami-05c13eab67c5d8861" # Replace with a valid AMI ID for your region
-  subnet_id              = var.subnet_id
-  vpc_security_group_ids = [var.security_group_id]
+resource "aws_instance" "my_ec2" {
+  instance_type   = var.instance_type
+  key_name        = var.key_name
+  ami             = "ami-05c13eab67c5d8861"  # Replace with your AMI ID
+  subnet_id       = aws_subnet.my_subnet.id
+  security_groups = [aws_security_group.my_sg.name]
 
   tags = {
     Name = "My EC2 Instance"
   }
 }
 
-output "instance_id" {
-  description = "Instance ID of the newly created EC2 instance"
-  value       = aws_instance.example.id
+resource "aws_iam_role" "lambda_execution_role" {
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "LambdaExecutionRole"
+  }
 }
 
-output "public_ip" {
-  description = "Public IP address of the newly created EC2 instance"
-  value       = aws_instance.example.public_ip
+resource "aws_iam_policy" "lambda_policy" {
+  name        = "LambdaPolicy"
+  description = "Policy for Lambda Execution"
+
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Action = [
+          "logs:*",
+          "s3:GetObject"
+        ],
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_policy_attach" {
+  role       = aws_iam_role.lambda_execution_role.name
+  policy_arn = aws_iam_policy.lambda_policy.arn
 }
